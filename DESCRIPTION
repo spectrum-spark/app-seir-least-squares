@@ -1,0 +1,10 @@
+Package: sirleastsquares
+Title: Least squares demo of SIR COVID-19 App
+Version: 0.0.1
+Description: List the package dependencies here for the GitHub action to automatically
+  include the packages on the build. This is required for r-shinylive version >= 0.3.0.
+Imports: 
+    shiny,
+    shinythemes
+    ggplot2
+Encoding: UTF-8
