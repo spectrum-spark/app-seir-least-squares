@@ -1,5 +1,8 @@
 library(shiny)
 library(ggplot2)
+if (FALSE) {
+  library(munsell)
+}
 
 ui <- fluidPage(
   sidebarLayout(
