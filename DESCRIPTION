@@ -6,5 +6,6 @@ Description: List the package dependencies here for the GitHub action to automat
 Imports: 
     shiny,
     shinythemes,
-    ggplot2
+    ggplot2,
+    munsell
 Encoding: UTF-8
