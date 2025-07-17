@@ -5,22 +5,90 @@ if (FALSE) {
 }
 
 ui <- fluidPage(
-  sidebarLayout(
-    sidebarPanel(
-      sliderInput("r0", "R0", min = 0, max = 10, value = 4, step = 0.1),
-      sliderInput("i0", "Initial infected", min = 0, max = 20, value = 20, step = 1),
-    ),
-    mainPanel(
-      plotOutput("sirPlot"),
-      textOutput("ssq")
-    )
+  titlePanel(
+    tags$div(
+  style = "
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+  ",
+  tags$img(src = "logo.png", height = "60px"),
+  tags$h2("Fitting an Epidemic Model with Least Squares", style = "margin: 0;")
+  ),
+  "Fitting an Epidemic Model with Least Squares"),
+
+
+  tags$style(HTML("
+  
+    @media (min-width: 992px) {
+        body::before {
+            content: '';
+            position: fixed;
+            top: -100vh;
+            left: 20;
+            width: 30px;
+            height: 200vh;
+            background: #DB4436;
+            transform: rotate(45deg);
+            z-index: -1;
+            pointer-events: none;
+
+            /* Simulate 3 lines using box-shadow */
+            box-shadow:
+            35px 0 #4BA5AB,
+            70px 0 #74C2CE;
+        }
+    }"
+  )),
+
+    tags$div(
+    style = "
+      background-color: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.05);
+    ",
+  
+  
+  tags$p("This app simulates a basic SEIR model and compares the model's incidence to observed COVID-19 case data from March 2020."),
+  tags$p("Use the sliders to adjust the basic reproduction number (R₀) and the initial number of infected individuals. The plot shows observed vs. simulated incidence, and the Sum of Squared Errors (SSQ) quantifies the fit."),
+  tags$p("Try and find the best solution by moving around the sliders."),
+
+  br(),
+  
+  fluidRow(
+  tags$style(HTML("
+    .flex-container {
+      display: flex;
+      align-items: center;
+    }
+    .slider-column {
+      flex: 0 0 300px;
+      padding-right: 30px;
+      padding-left: 30px;
+    }
+    .plot-column {
+      flex: 1;
+    }
+  ")),
+  
+  div(class = "flex-container",
+      div(class = "slider-column",
+          sliderInput("r0", "Basic Reproduction Number (R₀)", min = 0, max = 8, value = 4, step = 0.1),
+          sliderInput("i0", "Initial Infected Individuals", min = 0, max = 40, value = 20, step = 1)
+      ),
+      div(class = "plot-column",
+          h4(textOutput("ssq"), style = "color:#2C3E50; font-weight:bold; margin-bottom: 20px;"),
+          plotOutput("sirPlot", height = "500px")
+      )
   )
+)
+    )
 )
 
 server <- function(input, output) {
-
-library(tibble)
-
   uncontrolled_period <- tribble(
     ~Date,        ~Cases, ~Cumulative_cases,
     "2020-03-07",     2,   50,
@@ -48,15 +116,14 @@ library(tibble)
 
   incidence_frame <- reactive({
     N <- 6.6e7
-    gamma <- 1/6
+    gamma <- 1 / 6
     beta <- input$r0 * gamma
-    omega <- 1/5
+    omega <- 1 / 5
     I0 <- input$i0
     S0 <- N - I0
     R0 <- 0
     days <- nrow(uncontrolled_period)
     dt <- 0.1
-
     n <- ceiling(days / dt)
     time <- seq(0, by = dt, length.out = n)
 
@@ -71,58 +138,49 @@ library(tibble)
     R[1] <- R0
 
     for (t in 2:n) {
-      dS <- -beta * S[t-1] * I[t-1] / N
-      dE <- beta * S[t-1] * I[t-1] / N - omega * E[t-1]
-      dI <- omega * E[t-1] - gamma * I[t-1]
-      dR <- gamma * I[t-1]
+      dS <- -beta * S[t - 1] * I[t - 1] / N
+      dE <- beta * S[t - 1] * I[t - 1] / N - omega * E[t - 1]
+      dI <- omega * E[t - 1] - gamma * I[t - 1]
+      dR <- gamma * I[t - 1]
 
-      S[t] <- S[t-1] + dt * dS
-      E[t] <- E[t-1] + dt * dE
-      I[t] <- I[t-1] + dt * dI
-      R[t] <- R[t-1] + dt * dR
+      S[t] <- S[t - 1] + dt * dS
+      E[t] <- E[t - 1] + dt * dE
+      I[t] <- I[t - 1] + dt * dI
+      R[t] <- R[t - 1] + dt * dR
     }
 
     incidence <- E * omega
-
-    incidence_frame <- data.frame(time = uncontrolled_period$Date[1] + time, incidence = incidence, t = time)
-
-    incidence_frame
+    data.frame(time = uncontrolled_period$Date[1] + time, incidence = incidence, t = time)
   })
 
   incidence_frame_whole <- reactive({
-    incidence_frame_whole <- incidence_frame()
-    indexes <- which(incidence_frame_whole$t == floor(incidence_frame_whole$t))
-    incidence_frame_whole <- incidence_frame_whole[indexes,]
-    incidence_frame_whole$actual <- uncontrolled_period$Cases
-    incidence_frame_whole$difference <- incidence_frame_whole$actual - incidence_frame_whole$incidence
-
-    incidence_frame_whole
+    df <- incidence_frame()
+    indexes <- which(df$t == floor(df$t))
+    df <- df[indexes, ]
+    df$actual <- uncontrolled_period$Cases
+    df$difference <- df$actual - df$incidence
+    df
   })
 
   ssq <- reactive({
     sum(incidence_frame_whole()$difference ^ 2)
   })
-  
-  output$sirPlot <- renderPlot({
-    
-    # matplot(time, cbind(S, I, E, R),
-    #         type = "l", lty = 1, col = c("blue", "red", "green"),
-    #         xlab = "Time (days)", ylab = "Proportion",
-    #         main = "SIR Model (Euler's Method)")
-    # legend("right", legend = c("Susceptible", "Infected", "Recovered"),
-    #        col = c("blue", "red", "green", "orange"), lty = 1)
 
-    ggplot(incidence_frame(), aes(x=time, y=incidence)) +
-    geom_col(aes(x=Date, y=Cases), data = uncontrolled_period, fill = "red") +
-    geom_line() +
-    geom_point(data = incidence_frame_whole(), aes(x=time, y=actual)) +
-    geom_point(data = incidence_frame_whole()) +
-    geom_segment(aes(x = time, xend = time, y = actual, yend = incidence), data = incidence_frame_whole()) +
-    labs(x = "Date", y = "Incidence")
+  output$sirPlot <- renderPlot({
+    ggplot() +
+      geom_col(data = uncontrolled_period, aes(x = Date, y = Cases), fill = "#E74C3C", alpha = 0.6, width = 0.8) +
+      geom_line(data = incidence_frame(), aes(x = time, y = incidence), color = "#2C3E50", size = 1.2) +
+      geom_point(data = incidence_frame_whole(), aes(x = time, y = actual), color = "#E74C3C", size = 2) +
+      geom_point(data = incidence_frame_whole(), aes(x = time, y = incidence), color = "#2C3E50", size = 2) +
+      geom_segment(data = incidence_frame_whole(),
+                   aes(x = time, xend = time, y = actual, yend = incidence),
+                   color = "gray40", linetype = "dashed") +
+      labs(x = "Date", y = "Daily Incidence") +
+      theme_minimal(base_size = 14)
   })
 
   output$ssq <- renderText({
-    paste0("Sum of Squared Error (SSQ): ", prettyNum(round(ssq(), 2), big.mark=","))
+    paste0("Sum of Squared Error (SSQ): ", prettyNum(round(ssq(), 2), big.mark = ","))
   })
 }
 
